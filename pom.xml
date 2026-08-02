@@ -1,0 +1,66 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>dev.deepak.travel</groupId>
+    <artifactId>langchain4j-travel-assistant</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+
+    <name>LangChain4j Travel Assistant (Beginner's Guide companion project)</name>
+    <description>
+        Companion code for "Building Your First AI Agent in Java: A LangChain4j Beginner's Guide".
+        Two independent modules:
+          - weather-mcp-server: a standalone MCP server exposing a getWeather tool over stdio
+          - travel-assistant-client: the AI Service (Assistant) that calls a local tool
+            (convertCurrency) and the MCP server's tool (getWeather)
+    </description>
+
+    <modules>
+        <module>weather-mcp-server</module>
+        <module>travel-assistant-client</module>
+    </modules>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>17</maven.compiler.release>
+        <langchain4j.version>1.18.0</langchain4j.version>
+        <langchain4j.community.version>1.18.0-beta28</langchain4j.community.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j-bom</artifactId>
+                <version>${langchain4j.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j-community-bom</artifactId>
+                <version>${langchain4j.community.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <!-- Keeps real parameter names (city, amount, etc.) visible
+                             to the model instead of arg0, arg1 -->
+                        <parameters>true</parameters>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>

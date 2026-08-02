@@ -1,0 +1,53 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>dev.deepak.travel</groupId>
+        <artifactId>langchain4j-travel-assistant</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>weather-mcp-server</artifactId>
+    <packaging>jar</packaging>
+
+    <name>weather-mcp-server</name>
+    <description>
+        Standalone MCP server exposing a single getWeather tool over stdio (JSON-RPC).
+        Run it directly, or let travel-assistant-client launch it as a subprocess.
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-community-mcp-server</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>weather-mcp-server</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.3</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>dev.deepak.travel.server.WeatherMcpServerMain</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -1,0 +1,56 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>dev.deepak.travel</groupId>
+        <artifactId>langchain4j-travel-assistant</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>travel-assistant-client</artifactId>
+    <packaging>jar</packaging>
+
+    <name>travel-assistant-client</name>
+    <description>
+        The AI Service (Assistant): personality via @SystemMessage, a local @Tool
+        (convertCurrency), a tool provided over MCP (getWeather, from weather-mcp-server),
+        and per-conversation memory via ChatMemoryProvider.
+    </description>
+
+    <dependencies>
+        <!-- Core: AiServices, ChatMemory, @Tool, etc -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j</artifactId>
+        </dependency>
+
+        <!-- Talks to OpenAI's models. Swap for langchain4j-anthropic
+             or langchain4j-ollama later without touching your own code -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-open-ai</artifactId>
+        </dependency>
+
+        <!-- MCP client support: StdioMcpTransport, DefaultMcpClient, McpToolProvider -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-mcp</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>travel-assistant-client</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <mainClass>dev.deepak.travel.client.TravelAssistantDemo</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
