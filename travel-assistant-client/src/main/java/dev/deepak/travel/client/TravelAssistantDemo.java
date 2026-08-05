@@ -4,6 +4,7 @@ import dev.langchain4j.mcp.McpToolProvider;
 import dev.langchain4j.mcp.client.DefaultMcpClient;
 import dev.langchain4j.mcp.client.McpClient;
 import dev.langchain4j.mcp.client.transport.McpTransport;
+import dev.langchain4j.mcp.client.transport.http.StreamableHttpMcpTransport;
 import dev.langchain4j.mcp.client.transport.stdio.StdioMcpTransport;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
@@ -13,11 +14,16 @@ import dev.langchain4j.service.tool.ToolProvider;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Scanner;
 
 /**
  * Full demo from the article: personality + a local tool (convertCurrency) +
- * a tool served over MCP (getWeather, from the weather-mcp-server module) +
- * per-conversation memory, all wired into one AI Service.
+ * two tools served over MCP (getWeather, from the weather-mcp-server module,
+ * and flight search, from the public Kiwi.com MCP server) + per-conversation
+ * memory, all wired into one AI Service.
+ *
+ * Runs as an interactive console loop: type messages, get replies, type
+ * "exit" or "quit" (or Ctrl-D) to stop.
  *
  * Before running:
  *   1. Make sure Ollama is running locally (ollama serve) with the model
@@ -44,35 +50,64 @@ public class TravelAssistantDemo {
                 .timeout(Duration.ofMinutes(2)) // local inference is slower than a hosted API
                 .build();
 
-        McpTransport transport = StdioMcpTransport.builder()
+        // weather-mcp-server: our own MCP server, launched as a local subprocess over stdio
+        McpTransport weatherTransport = StdioMcpTransport.builder()
                 .command(List.of("java", "-jar", WEATHER_SERVER_JAR))
                 .logEvents(true) // see the JSON-RPC traffic in your logs
                 .build();
 
-        McpClient mcpClient = DefaultMcpClient.builder()
+        McpClient weatherMcpClient = DefaultMcpClient.builder()
                 .key("weather-server")
-                .transport(transport)
+                .transport(weatherTransport)
                 .build();
 
-        ToolProvider weatherToolProvider = McpToolProvider.builder()
-                .mcpClients(mcpClient)
+        // Kiwi.com's public flight search MCP server: someone else's server, reached over
+        // Streamable HTTP. No subprocess, no API key - just a URL.
+        McpTransport flightTransport = StreamableHttpMcpTransport.builder()
+                .url("https://mcp.kiwi.com")
+                .logRequests(true)
+                .logResponses(true)
+                .build();
+
+        McpClient flightMcpClient = DefaultMcpClient.builder()
+                .key("kiwi-flight-search")
+                .transport(flightTransport)
+                .build();
+
+        ToolProvider toolProvider = McpToolProvider.builder()
+                .mcpClients(weatherMcpClient, flightMcpClient)
                 .build();
 
         Assistant assistant = AiServices.builder(Assistant.class)
                 .chatModel(model)
-                .tools(new TravelTools())              // convertCurrency: still local
-                .toolProvider(weatherToolProvider)      // getWeather: now over MCP
+                .tools(new TravelTools())     // convertCurrency: still local
+                .toolProvider(toolProvider)   // getWeather + search-flight: both over MCP
                 .chatMemoryProvider(id -> MessageWindowChatMemory.withMaxMessages(10))
                 .build();
 
-        try {
-            String conversationId = "demo-user";
+        try (Scanner scanner = new Scanner(System.in)) {
+            String conversationId = "console-user";
 
-            System.out.println(assistant.chat(conversationId, "I'm planning a trip to Paris"));
-            System.out.println(assistant.chat(conversationId, "What's the weather like there?"));
-            System.out.println(assistant.chat(conversationId, "If I bring 500 USD, how much is that in EUR?"));
+            System.out.println("Travel Assistant ready. Type a message (or 'exit' to quit).");
+            while (true) {
+                System.out.print("> ");
+                if (!scanner.hasNextLine()) {
+                    break; // Ctrl-D / stdin closed
+                }
+                String input = scanner.nextLine().trim();
+                if (input.isEmpty()) {
+                    continue;
+                }
+                if (input.equalsIgnoreCase("exit") || input.equalsIgnoreCase("quit")) {
+                    break;
+                }
+
+                String response = assistant.chat(conversationId, input);
+                System.out.println(response);
+            }
         } finally {
-            mcpClient.close();
+            weatherMcpClient.close();
+            flightMcpClient.close();
         }
     }
 }
