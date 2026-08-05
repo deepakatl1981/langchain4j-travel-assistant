@@ -7,12 +7,12 @@ Two independent Maven modules:
 - **weather-mcp-server** — a standalone MCP server exposing one tool, `getWeather`, over stdio (JSON-RPC). It knows nothing about the client that will call it.
 - **travel-assistant-client** — the AI Service (`Assistant`). It has a personality (`@SystemMessage`), a local tool (`convertCurrency`), per-conversation memory (`ChatMemoryProvider`), and it pulls `getWeather` from the MCP server above via `McpToolProvider`.
 
-Requires JDK 17+ and an `OPENAI_API_KEY` (swap `langchain4j-open-ai` for `langchain4j-anthropic` or `langchain4j-ollama` in `travel-assistant-client/pom.xml` if you'd rather use a different provider).
+Requires JDK 17+ and a local [Ollama](https://ollama.com) server running with `llama3.2` pulled (`ollama pull llama3.2`). Plain `llama3` is not reliable at tool calling, so use `llama3.2` or newer. Swap `langchain4j-ollama` for `langchain4j-open-ai` or `langchain4j-anthropic` in `travel-assistant-client/pom.xml` if you'd rather use a hosted provider.
 
 ## 1. Build everything
 
 ```bash
-export OPENAI_API_KEY=sk-...
+ollama serve          # if not already running as a background service
 mvn clean package
 ```
 
