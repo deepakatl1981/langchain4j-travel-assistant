@@ -18,9 +18,10 @@ import java.util.Scanner;
 
 /**
  * Full demo from the article: personality + a local tool (convertCurrency) +
- * two tools served over MCP (getWeather, from the weather-mcp-server module,
- * and flight search, from the public Kiwi.com MCP server) + per-conversation
- * memory, all wired into one AI Service.
+ * three tools served over MCP (getWeather, from the weather-mcp-server
+ * module; flight search, from the public Kiwi.com MCP server; and hotel
+ * search, from the public trivago MCP server) + per-conversation memory,
+ * all wired into one AI Service.
  *
  * Runs as an interactive console loop: type messages, get replies, type
  * "exit" or "quit" (or Ctrl-D) to stop.
@@ -74,14 +75,27 @@ public class TravelAssistantDemo {
                 .transport(flightTransport)
                 .build();
 
+        // trivago's public hotel search MCP server: same idea as Kiwi above, a different
+        // provider, same Streamable HTTP pattern. No subprocess, no API key.
+        McpTransport hotelTransport = StreamableHttpMcpTransport.builder()
+                .url("https://mcp.trivago.com/mcp")
+                .logRequests(true)
+                .logResponses(true)
+                .build();
+
+        McpClient hotelMcpClient = DefaultMcpClient.builder()
+                .key("trivago-hotel-search")
+                .transport(hotelTransport)
+                .build();
+
         ToolProvider toolProvider = McpToolProvider.builder()
-                .mcpClients(weatherMcpClient, flightMcpClient)
+                .mcpClients(weatherMcpClient, flightMcpClient, hotelMcpClient)
                 .build();
 
         Assistant assistant = AiServices.builder(Assistant.class)
                 .chatModel(model)
                 .tools(new TravelTools())     // convertCurrency: still local
-                .toolProvider(toolProvider)   // getWeather + search-flight: both over MCP
+                .toolProvider(toolProvider)   // getWeather + search-flight + trivago-accommodation-search: all over MCP
                 .chatMemoryProvider(id -> MessageWindowChatMemory.withMaxMessages(10))
                 .build();
 
@@ -108,6 +122,7 @@ public class TravelAssistantDemo {
         } finally {
             weatherMcpClient.close();
             flightMcpClient.close();
+            hotelMcpClient.close();
         }
     }
 }

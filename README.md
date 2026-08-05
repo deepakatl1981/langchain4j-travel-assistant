@@ -5,16 +5,19 @@ Companion code for the Medium article *"Building Your First AI Agent in Java: A 
 Two independent Maven modules:
 
 - **weather-mcp-server** — a standalone MCP server exposing one tool, `getWeather`, over stdio (JSON-RPC). It knows nothing about the client that will call it.
-- **travel-assistant-client** — the AI Service (`Assistant`). It has a personality (`@SystemMessage`), a local tool (`convertCurrency`), per-conversation memory (`ChatMemoryProvider`), and it pulls tools from two separate MCP servers via `McpToolProvider`: `getWeather` from the module above (stdio) and flight search from Kiwi.com's public MCP server (Streamable HTTP).
+- **travel-assistant-client** — the AI Service (`Assistant`). It has a personality (`@SystemMessage`), a local tool (`convertCurrency`), per-conversation memory (`ChatMemoryProvider`), and it pulls tools from three separate MCP servers via `McpToolProvider`: `getWeather` from the module above (stdio), flight search from Kiwi.com's public MCP server, and hotel search from trivago's public MCP server (both Streamable HTTP).
 
 Requires JDK 17+, internet access, and a local [Ollama](https://ollama.com) server running with `llama3.2` pulled (`ollama pull llama3.2`). Plain `llama3` is not reliable at tool calling, so use `llama3.2` or newer. Swap `langchain4j-ollama` for `langchain4j-open-ai` or `langchain4j-anthropic` in `travel-assistant-client/pom.xml` if you'd rather use a hosted provider.
 
 All tools call free, keyless external services instead of hardcoded data:
 - `convertCurrency` calls the [Frankfurter](https://frankfurter.dev) exchange-rate REST API directly (no MCP involved — it's a local `@Tool`).
 - `getWeather` calls [Open-Meteo](https://open-meteo.com) — first its geocoding API to resolve a city name to coordinates, then its forecast API for current conditions — from inside the `weather-mcp-server` module, over MCP.
-- Flight search comes from Kiwi.com's official public MCP server at `https://mcp.kiwi.com` (tool name `search-flight`). This one isn't a REST call we wrote — it's a *second, independent MCP server* that `travel-assistant-client` connects to directly over Streamable HTTP, alongside the stdio connection to `weather-mcp-server`. No code of ours implements it; `McpToolProvider` discovers and exposes whatever tools that remote server advertises.
+- Flight search comes from Kiwi.com's official public MCP server at `https://mcp.kiwi.com` (tool name `search-flight`).
+- Hotel search comes from trivago's official public MCP server at `https://mcp.trivago.com/mcp` (tools `trivago-accommodation-search` by destination name, and `trivago-accommodation-radius-search` by coordinates), which itself compares live prices across Booking.com, Expedia, Hotels.com, Agoda, and others in one call. Note the required parameter names are `query`/`arrival`/`departure`, not `destination`/`check_in`/`check_out` — the model maps your natural-language dates to these itself.
 
-None of these require an API key, but all three require outbound internet access from wherever you run the app.
+Flight and hotel search aren't REST calls we wrote — they're *independent MCP servers* that `travel-assistant-client` connects to directly over Streamable HTTP, alongside the stdio connection to `weather-mcp-server`. No code of ours implements either; `McpToolProvider` discovers and exposes whatever tools each remote server advertises.
+
+None of these require an API key, but all four require outbound internet access from wherever you run the app.
 
 ## 1. Build everything
 
@@ -49,10 +52,11 @@ This is now an interactive console loop — type a message, press Enter, read th
 > What's the weather like there?
 > If I bring 500 USD, how much is that in EUR?
 > Find me a flight from London to Paris on 2026-09-15
+> Find me a hotel in Paris, check in 2026-09-15, check out 2026-09-18
 > exit
 ```
 
-The weather question round-trips over MCP through the separate `weather-mcp-server` process. The currency question is a plain local method call. The flight question round-trips over MCP too, but to `https://mcp.kiwi.com` instead — a server we didn't write and don't run. Same `.chat(...)` call every time — same `conversationId` throughout, so the assistant remembers earlier turns (up to the last 10 messages).
+The weather question round-trips over MCP through the separate `weather-mcp-server` process. The currency question is a plain local method call. The flight and hotel questions round-trip over MCP too, but to `https://mcp.kiwi.com` and `https://mcp.trivago.com/mcp` respectively — servers we didn't write and don't run. Same `.chat(...)` call every time — same `conversationId` throughout, so the assistant remembers earlier turns (up to the last 10 messages).
 
 ## Project layout
 
@@ -76,11 +80,12 @@ langchain4j-travel-assistant/
 
 See the article for the walkthrough of each piece: AI Services, `@SystemMessage`, `@Tool`, `ChatMemoryProvider` / `@MemoryId`, and the MCP client/server split.
 
-## Connecting to a second, external MCP server
+## Connecting to multiple external MCP servers
 
-`TravelAssistantDemo` builds two `McpClient` instances and passes both to a single `McpToolProvider.builder().mcpClients(weatherMcpClient, flightMcpClient)`:
+`TravelAssistantDemo` builds three `McpClient` instances and passes all of them to a single `McpToolProvider.builder().mcpClients(weatherMcpClient, flightMcpClient, hotelMcpClient)`:
 
 - `weatherMcpClient` uses `StdioMcpTransport` — it launches `weather-mcp-server` as a local subprocess we built and own.
 - `flightMcpClient` uses `StreamableHttpMcpTransport` pointed at `https://mcp.kiwi.com` — a server owned and run by Kiwi.com, reached over plain HTTP. No subprocess, no jar to build, no API key.
+- `hotelMcpClient` uses the same `StreamableHttpMcpTransport` pattern, pointed at `https://mcp.trivago.com/mcp` instead.
 
-`McpToolProvider` merges the tools from both servers into one pool the model can call from. This is the same pattern you'd use to connect to any other public MCP server — swap the URL, drop in the client, add it to `mcpClients(...)`.
+`McpToolProvider` merges the tools from all three servers into one pool the model can call from. This is the same pattern you'd use to connect to any other public MCP server — swap the URL, drop in the client, add it to `mcpClients(...)`. If two servers ever exposed a tool with a clashing name, `McpToolProvider` also supports a `filter(...)` or `toolNameMapper(...)` to disambiguate — not needed here since `getWeather`, `search-flight`, and `search_hotels` are all distinct.
